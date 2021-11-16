@@ -21,10 +21,14 @@
         font-size: 30px;
         text-align: center;
       }
+
+      /* .city {
+        pointer-events: none;
+      } */
     </style>
   </head>
   <body>
-    <svg id="plot" width="1200" height="800"></svg>
+    <svg id="plot" width="1500" height="1000"></svg>
 
     <script>
       (async () => {
@@ -73,6 +77,11 @@
             stateColorScale(totalCrimesInStates.get(d.properties.NAME))
           );
 
+        let radiusScale = d3
+          .scaleLinear()
+          .domain(totalCrimesExtents)
+          .range([3, 10]);
+
         viewport
           .selectAll("cities")
           .data(cities.features)
@@ -80,7 +89,13 @@
           .attr("class", "city")
           .attr("cx", (d) => projection(d.geometry.coordinates)[0])
           .attr("cy", (d) => projection(d.geometry.coordinates)[1])
-          .attr("r", 10)
+          .attr("r", (d) => {
+            let crimeRecord = crimesRecord.get(
+              `${d.properties.state}/${d.properties.name}`
+            );
+            if (!crimeRecord) return 0;
+            return radiusScale(crimeRecord.cases);
+          })
           .attr("visibility", "hidden")
           .attr("fill", (d) => {
             let crimeRecord = crimesRecord.get(
@@ -107,22 +122,76 @@
           .on("click", (event, d) =>
             clickState(event, d, width, height, svg, path, zoom)
           );
+
+        let tooltipWidth = 120;
+        let tooltipHeight = 50;
+        const tooltip = viewport
+          .append("g")
+          .attr("class", "tooltip")
+          .attr("visibility", "hidden");
+        tooltip
+          .append("rect")
+          .attr("fill", "steelblue")
+          .attr("opacity", 0.8)
+          .attr("width", tooltipWidth)
+          .attr("height", tooltipHeight);
+        let cityLabel = tooltip.append("text").attr("x", 2).attr("y", 2);
+        let casesLabel = tooltip.append("text").attr("x", 2).attr("y", 12);
+        let solveLabel = tooltip.append("text").attr("x", 2).attr("y", 22);
+        let rateLabel = tooltip.append("text").attr("x", 2).attr("y", 32);
+
+        tooltip
+          .selectAll("text")
+          .attr("fill", "white")
+          .attr("alignment-baseline", "hanging")
+          .style("font-size", "9px");
+        viewport.selectAll(".city").on("mouseenter", mouseEntersPlot);
+        viewport.selectAll(".city").on("mouseout", mouseLeavesPlot);
+
+        function mouseEntersPlot() {
+          tooltip.style("visibility", "visible");
+
+          const city = d3.select(this);
+          const data = city.datum();
+          const coordinates = data.geometry.coordinates;
+          const properties = data.properties;
+
+          let crimeRecord = crimesRecord.get(
+            `${properties.state}/${properties.name}`
+          );
+          if (!crimeRecord) return;
+
+          let pos = projection(coordinates);
+          let xPos = pos[0] + 10;
+          let yPos = pos[1];
+
+          tooltip.attr("transform", `translate(${xPos},${yPos})`);
+          cityLabel.text("City: " + properties.name);
+          casesLabel.text("# of cases: " + crimeRecord.cases);
+          solveLabel.text("# of solved cases: " + crimeRecord.solve);
+          rateLabel.text(
+            "Crime solve rate: " + Math.round(crimeRecord.rate * 100) + "%"
+          );
+        }
+
+        function mouseLeavesPlot() {
+          tooltip.style("visibility", "hidden");
+        }
       })();
 
       const mapZoomed = (transform, viewport) => {
         viewport.attr("transform", transform.toString());
-        console.log(transform.k);
         viewport
           .selectAll(".city")
-          .attr("visibility", transform.k > 1.5 ? "visible" : "hidden");
+          .attr("visibility", transform.k > 1.2 ? "visible" : "hidden");
       };
 
       const clickState = (event, d, mapWidth, mapHeight, svg, path, zoom) => {
-        let bounds = path.bounds(d.geometry); // get bounds for clicked state/county
-        let dx = bounds[1][0] - bounds[0][0]; // width of state/county
-        let dy = bounds[1][1] - bounds[0][1]; // height of state/county
-        let x = (bounds[0][0] + bounds[1][0]) / 2; // center x of state/county
-        let y = (bounds[0][1] + bounds[1][1]) / 2; // center y of state/county
+        let bounds = path.bounds(d.geometry);
+        let dx = bounds[1][0] - bounds[0][0];
+        let dy = bounds[1][1] - bounds[0][1];
+        let x = bounds[0][0] + bounds[1][0];
+        let y = bounds[0][1] + bounds[1][1];
 
         let scale = Math.max(
           1,
@@ -150,7 +219,7 @@
             .attr("height", barHeight)
             .style("fill", () => scale(i));
         }
-        legend.attr("transform", "translate(0,750)");
+        legend.attr("transform", "translate(0,950)");
       };
     </script>
   </body>
