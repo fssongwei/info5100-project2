@@ -107,6 +107,7 @@
             if (crimeRecord.rate > 0.7) return "green";
             return "red";
           });
+        //   .on("mouseenter", mouseEntersPlot());
 
         drawLegend(stateColorScale, totalCrimesExtents, svg);
 
@@ -190,8 +191,8 @@
         let bounds = path.bounds(d.geometry);
         let dx = bounds[1][0] - bounds[0][0];
         let dy = bounds[1][1] - bounds[0][1];
-        let x = bounds[0][0] + bounds[1][0];
-        let y = bounds[0][1] + bounds[1][1];
+        let x = (bounds[0][0] + bounds[1][0]) / 2;
+        let y = (bounds[0][1] + bounds[1][1]) / 2;
 
         let scale = Math.max(
           1,
