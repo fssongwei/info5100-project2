@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <title>Project 2</title>
+
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+      }
+
+      h2 {
+        font-family: "Bebas Neue", cursive;
+        font-size: 30px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="plot" width="1200" height="800"></svg>
+
+    <script>
+      (async () => {
+        const svg = d3.select("svg#plot");
+        const viewport = svg.append("g");
+        const width = svg.attr("width");
+        const height = svg.attr("height");
+
+        const statesGeoData = await d3.json("./us.json", d3.autoType);
+        const states = topojson.feature(
+          statesGeoData,
+          statesGeoData.objects.states
+        );
+        const citiesGeoData = await d3.json("./cities.json", d3.autoType);
+        const cities = topojson.feature(
+          citiesGeoData,
+          citiesGeoData.objects.us_cities
+        );
+
+        const projection = d3.geoAlbersUsa().fitSize([width, height], states);
+        const path = d3.geoPath().projection(projection);
+
+        const crimeData = await d3.csv("./crime.csv", d3.autoType);
+
+        const totalCrimesExtents = d3.extent(crimeData, (d) => d.cases);
+        const totalCrimesInStates = new Map();
+        const crimesRecord = new Map();
+        for (let { state, city, cases, solve, rate } of crimeData) {
+          let nCase = (totalCrimesInStates.get(state) || 0) + cases;
+          totalCrimesInStates.set(state, nCase);
+          crimesRecord.set(`${state}/${city}`, { cases, solve, rate });
+        }
+
+        const stateColorScale = d3
+          .scaleLinear()
+          .domain(totalCrimesExtents)
+          .range([d3.rgb("#eee"), d3.rgb("#999")]);
+
+        viewport
+          .selectAll("states")
+          .data(states.features)
+          .join("path")
+          .attr("class", "states")
+          .attr("d", path)
+          .style("fill", (d) =>
+            stateColorScale(totalCrimesInStates.get(d.properties.NAME))
+          );
+
+        viewport
+          .selectAll("cities")
+          .data(cities.features)
+          .join("circle")
+          .attr("class", "city")
+          .attr("cx", (d) => projection(d.geometry.coordinates)[0])
+          .attr("cy", (d) => projection(d.geometry.coordinates)[1])
+          .attr("r", 10)
+          .attr("visibility", "hidden")
+          .attr("fill", (d) => {
+            let crimeRecord = crimesRecord.get(
+              `${d.properties.state}/${d.properties.name}`
+            );
+            if (!crimeRecord) {
+              return "transparent";
+            }
+            if (crimeRecord.rate > 0.7) return "green";
+            return "red";
+          });
+
+        drawLegend(stateColorScale, totalCrimesExtents, svg);
+
+        const zoom = d3
+          .zoom()
+          .scaleExtent([1, 10])
+          .on("zoom", ({ transform }) => mapZoomed(transform, viewport));
+
+        svg.call(zoom);
+
+        viewport
+          .selectAll(".states")
+          .on("click", (event, d) =>
+            clickState(event, d, width, height, svg, path, zoom)
+          );
+      })();
+
+      const mapZoomed = (transform, viewport) => {
+        viewport.attr("transform", transform.toString());
+        console.log(transform.k);
+        viewport
+          .selectAll(".city")
+          .attr("visibility", transform.k > 1.5 ? "visible" : "hidden");
+      };
+
+      const clickState = (event, d, mapWidth, mapHeight, svg, path, zoom) => {
+        let bounds = path.bounds(d.geometry); // get bounds for clicked state/county
+        let dx = bounds[1][0] - bounds[0][0]; // width of state/county
+        let dy = bounds[1][1] - bounds[0][1]; // height of state/county
+        let x = (bounds[0][0] + bounds[1][0]) / 2; // center x of state/county
+        let y = (bounds[0][1] + bounds[1][1]) / 2; // center y of state/county
+
+        let scale = Math.max(
+          1,
+          Math.min(5, 0.5 / Math.max(dx / mapWidth, dy / mapHeight))
+        );
+        let translate = [mapWidth / 2 - x * scale, mapHeight / 2 - y * scale];
+
+        let newTransform = d3.zoomIdentity
+          .translate(translate[0], translate[1])
+          .scale(scale);
+        svg.transition().duration(1000).call(zoom.transform, newTransform);
+      };
+
+      const drawLegend = (scale, domain, svg) => {
+        let legend = svg.append("g");
+        let gap = Math.ceil((domain[1] - domain[0]) / 5);
+        let barWidth = 50;
+        let barHeight = 10;
+        for (let i = domain[0]; i <= domain[1]; i += gap) {
+          let rectangle = legend
+            .append("rect")
+            .attr("x", 0 + (i / gap) * barWidth)
+            .attr("y", 0)
+            .attr("width", barWidth)
+            .attr("height", barHeight)
+            .style("fill", () => scale(i));
+        }
+        legend.attr("transform", "translate(0,750)");
+      };
+    </script>
+  </body>
+</html>
