@@ -30,19 +30,37 @@
     </style>
   </head>
   <body>
-      <h2>Mapping Homicide Cases Across the US</h2>
-      <h5>Justin Shih (jgs279), Zihao Fan (zf54), Wei Song (ws446), Mina Barakatain(mmb362)</h5><br />
-      We looked at datasets pertaining to homicide cases in the United States from both a state and city level. We were interested in understanding <b>which states have the highest number of homicides, which cities within
-    those states have the largest homicide cases and and the crime-solved rate for each of those cities.</b> Looking at the map, we can see the darkest shades of gray represent the states with the highest number of homicides.<br />
-  Zoom in to see the cities for each state or click on a state to learn more about the crime-solved within each state.</p>
-    <svg id="plot" width="1200" height="800" style="border: 2px solid black;"></svg>
+    <h2>Mapping Homicide Cases Across the US</h2>
+    <h5>
+      Justin Shih (jgs279), Zihao Fan (zf54), Wei Song (ws446), Mina
+      Barakatain(mmb362)
+    </h5>
+    <div style="width: 1300px">
+      We looked at datasets pertaining to homicide cases in the United States
+      from both a state and city level. We were interested in understanding
+      <b
+        >which states have the highest number of homicides, which cities within
+        those states have the largest homicide cases and and the crime-solved
+        rate for each of those cities.</b
+      >
+      Looking at the map, we can see the darkest shades of gray represent the
+      states with the highest number of homicides.<br />
+      Zoom in to see the cities for each state or click on a state to learn more
+      about the crime-solved within each state.
+    </div>
+    <svg
+      id="plot"
+      width="1200"
+      height="800"
+      style="border: 2px solid black; padding: 50px"
+    ></svg>
 
     <script>
       (async () => {
         const svg = d3.select("svg#plot");
-        const viewport = svg.append("g");
         const width = svg.attr("width");
         const height = svg.attr("height");
+        const viewport = svg.append("g");
 
         const statesGeoData = await d3.json("./us.json", d3.autoType);
         const states = topojson.feature(
@@ -82,7 +100,13 @@
           .attr("d", path)
           .style("fill", (d) =>
             stateColorScale(totalCrimesInStates.get(d.properties.NAME))
-          );
+          )
+          .on("mouseover", function () {
+            d3.select(this).attr("stroke", "white").attr("stroke-width", "2px");
+          })
+          .on("mouseout", function () {
+            d3.select(this).attr("stroke-width", 0);
+          });
 
         let radiusScale = d3
           .scaleLinear()
@@ -104,6 +128,7 @@
             return radiusScale(crimeRecord.cases);
           })
           .attr("visibility", "hidden")
+          .attr("opacity", 0.7)
           .attr("fill", (d) => {
             let crimeRecord = crimesRecord.get(
               `${d.properties.state}/${d.properties.name}`
@@ -111,8 +136,8 @@
             if (!crimeRecord) {
               return "transparent";
             }
-            if (crimeRecord.rate > 0.7) return "green";
-            return "red";
+            if (crimeRecord.rate > 0.7) return "#0CA77D";
+            return "#F1A208";
           });
         //   .on("mouseenter", mouseEntersPlot());
 
@@ -164,6 +189,14 @@
           const coordinates = data.geometry.coordinates;
           const properties = data.properties;
 
+          city
+            .attr("opacity", 1)
+            .attr("stroke", "white")
+            .attr("stroke-width", "1px");
+          let currentR = city.attr("r");
+          city.attr("r", currentR * 1.5);
+          city.attr("originalRadius", currentR);
+
           let crimeRecord = crimesRecord.get(
             `${properties.state}/${properties.name}`
           );
@@ -183,6 +216,10 @@
         }
 
         function mouseLeavesPlot() {
+          const city = d3.select(this);
+          city.attr("opacity", 1).attr("stroke-width", "0px");
+          let originalR = city.attr("originalRadius");
+          city.attr("r", originalR);
           tooltip.style("visibility", "hidden");
         }
       })();
@@ -227,7 +264,7 @@
             .attr("height", barHeight)
             .style("fill", () => scale(i));
         }
-        legend.attr("transform", "translate(0,950)");
+        legend.attr("transform", "translate(0,800)");
       };
     </script>
   </body>
