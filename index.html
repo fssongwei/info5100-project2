@@ -15,6 +15,7 @@
         align-items: center;
         flex-direction: column;
         font-family: "Arial";
+        background-color: #fbfaf6;
       }
 
       h2 {
@@ -22,6 +23,11 @@
         font-family: "Arial";
         font-size: 30px;
         text-align: center;
+      }
+      .outline {
+        stroke: white;
+        stroke-width: 3px;
+        fill: none;
       }
 
       /* .city {
@@ -48,12 +54,7 @@
       Zoom in to see the cities for each state or click on a state to learn more
       about the crime-solved within each state.
     </div>
-    <svg
-      id="plot"
-      width="1200"
-      height="800"
-      style="border: 2px solid black; padding: 50px"
-    ></svg>
+    <svg id="plot" width="1200" height="800" style="padding: 50px"></svg>
 
     <script>
       (async () => {
@@ -67,6 +68,12 @@
           statesGeoData,
           statesGeoData.objects.states
         );
+
+        const statesMesh = topojson.mesh(
+          statesGeoData,
+          statesGeoData.objects.states
+        );
+
         const citiesGeoData = await d3.json("./cities.json", d3.autoType);
         const cities = topojson.feature(
           citiesGeoData,
@@ -78,19 +85,22 @@
 
         const crimeData = await d3.csv("./crime.csv", d3.autoType);
 
-        const totalCrimesExtents = d3.extent(crimeData, (d) => d.cases);
         const totalCrimesInStates = new Map();
         const crimesRecord = new Map();
+        const nCasesInStates = [];
         for (let { state, city, cases, solve, rate } of crimeData) {
           let nCase = (totalCrimesInStates.get(state) || 0) + cases;
           totalCrimesInStates.set(state, nCase);
+          nCasesInStates.push(nCase);
           crimesRecord.set(`${state}/${city}`, { cases, solve, rate });
         }
+        // const totalCrimesExtents = d3.extent(nCasesInStates);
+        totalCrimesExtents = [0, 160000];
 
         const stateColorScale = d3
           .scaleLinear()
           .domain(totalCrimesExtents)
-          .range([d3.rgb("#eee"), d3.rgb("#999")]);
+          .range([d3.rgb("#eee"), d3.rgb("#000")]);
 
         viewport
           .selectAll("states")
@@ -98,15 +108,50 @@
           .join("path")
           .attr("class", "states")
           .attr("d", path)
-          .style("fill", (d) =>
-            stateColorScale(totalCrimesInStates.get(d.properties.NAME))
-          )
+          .style("fill", (d) => {
+            return stateColorScale(totalCrimesInStates.get(d.properties.NAME));
+          })
           .on("mouseover", function () {
-            d3.select(this).attr("stroke", "white").attr("stroke-width", "2px");
+            d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
+            // this.parentNode.appendChild(this);
+            // d3.select(this).attr("transform", `scale(${1.1})`);
+            // d3.select(this).attr("transform-origin", "center");
           })
           .on("mouseout", function () {
             d3.select(this).attr("stroke-width", 0);
+            // this.parentNode.insertBefore(this, this.parentNode.firstChild);
           });
+
+        // console.log(statesMesh);
+
+        // viewport
+        //   .selectAll(".outline")
+        //   .data(statesMesh.features)
+        //   .join("path")
+        //   .attr("class", "outline")
+        //   .attr("d", path)
+        //   .on("mouseover", function () {
+        //     d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
+        //     // d3.select(this).attr("transform", `scale(${1.1})`);
+        //     // d3.select(this).attr("transform-origin", "center");
+        //   })
+        //   .on("mouseout", function () {
+        //     d3.select(this).attr("stroke-width", 0);
+        //   });
+
+        // viewport
+        //   .append("path")
+        //   .datum(statesMesh)
+        //   .attr("class", "outline")
+        //   .attr("d", path)
+        //   .on("mouseover", function () {
+        //     d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
+        //     // d3.select(this).attr("transform", `scale(${1.1})`);
+        //     // d3.select(this).attr("transform-origin", "center");
+        //   })
+        //   .on("mouseout", function () {
+        //     d3.select(this).attr("stroke-width", 0);
+        //   });
 
         let radiusScale = d3
           .scaleLinear()
@@ -164,7 +209,7 @@
           .attr("visibility", "hidden");
         tooltip
           .append("rect")
-          .attr("fill", "steelblue")
+          .attr("fill", "white")
           .attr("opacity", 0.8)
           .attr("width", tooltipWidth)
           .attr("height", tooltipHeight);
@@ -175,7 +220,7 @@
 
         tooltip
           .selectAll("text")
-          .attr("fill", "white")
+          .attr("fill", "black")
           .attr("alignment-baseline", "hanging")
           .style("font-size", "9px");
         viewport.selectAll(".city").on("mouseenter", mouseEntersPlot);
@@ -222,6 +267,59 @@
           city.attr("r", originalR);
           tooltip.style("visibility", "hidden");
         }
+
+        // Circle Legend 2
+        let crimeSolveRateLegend = svg.append("g");
+        let LegendBox = crimeSolveRateLegend
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", 135)
+          .attr("height", 90)
+          // .attr("stroke-width", "1px")
+          // .attr("stroke", "black")
+          .attr("fill", "steelblue")
+          .attr("opacity", 0.8);
+
+        crimeSolveRateLegend
+          .append("text")
+          .attr("x", 2)
+          .attr("y", 20)
+          .text("Crime Solve Rate");
+
+        crimeSolveRateLegend
+          .append("circle")
+          .attr("cx", 15)
+          .attr("cy", 40)
+          .attr("r", 10)
+          .style("fill", "#0CA77D");
+
+        crimeSolveRateLegend
+          .append("circle")
+          .attr("cx", 15)
+          .attr("cy", 70)
+          .attr("r", 10)
+          .style("fill", "#F1A208");
+
+        crimeSolveRateLegend
+          .append("text")
+          .attr("x", 35)
+          .attr("y", 45)
+          .text(" >= 70%");
+
+        crimeSolveRateLegend
+          .append("text")
+          .attr("x", 2)
+          .attr("y", 20)
+          .text("Crime Solve Rate");
+
+        crimeSolveRateLegend
+          .append("text")
+          .attr("x", 35)
+          .attr("y", 75)
+          .text(" < 70%");
+
+        crimeSolveRateLegend.attr("transform", "translate(1050,700)");
       })();
 
       const mapZoomed = (transform, viewport) => {
@@ -263,8 +361,15 @@
             .attr("width", barWidth)
             .attr("height", barHeight)
             .style("fill", () => scale(i));
+
+          let label = legend
+            .append("text")
+            .text(i == 0 ? 0 : i / 1000 + "k")
+            .attr("font-family", "Bebas Neue")
+            .attr("x", 0 + (i / gap) * barWidth)
+            .attr("y", barHeight + 15);
         }
-        legend.attr("transform", "translate(0,800)");
+        legend.attr("transform", "translate(0,750)");
       };
     </script>
   </body>
