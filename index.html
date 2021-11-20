@@ -101,6 +101,11 @@
         totalCrimesExtents = [0, 160000];
 
         const stateColorScale = d3
+          .scaleLinear()
+          .domain(totalCrimesExtents)
+          .range([d3.rgb("#eee"), d3.rgb("#000")]);
+
+        const quantizeScale = d3
           .scaleQuantize()
           .domain(totalCrimesExtents)
           .range([
@@ -169,13 +174,11 @@
         const hoverLegend = (i) => {
           viewport.selectAll(".states").attr("opacity", (d) => {
             let nCrimes = totalCrimesInStates.get(d.properties.NAME);
-            console.log(stateColorScale(nCrimes));
-            if (stateColorScale(i) == stateColorScale(nCrimes)) {
+            if (quantizeScale(i) == quantizeScale(nCrimes)) {
               return 1;
             }
             return 0.1;
           });
-          console.log(i);
         };
 
         const leaveLegend = () => {
