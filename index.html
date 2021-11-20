@@ -54,7 +54,7 @@
       Zoom in to see the cities for each state or click on a state to learn more
       about the crime-solved within each state.
     </div>
-    <svg id="plot" width="1200" height="800" style="padding: 50px"></svg>
+    <svg id="plot" width="1400" height="800" style="padding: 50px"></svg>
 
     <script>
       (async () => {
@@ -101,9 +101,16 @@
         totalCrimesExtents = [0, 160000];
 
         const stateColorScale = d3
-          .scaleLinear()
+          .scaleQuantize()
           .domain(totalCrimesExtents)
-          .range([d3.rgb("#eee"), d3.rgb("#000")]);
+          .range([
+            d3.rgb("#eee"),
+            d3.rgb("#ccc"),
+            d3.rgb("#999"),
+            d3.rgb("#666"),
+            d3.rgb("#333"),
+            d3.rgb("#000"),
+          ]);
 
         const stateElem = viewport.append("g");
 
@@ -159,7 +166,29 @@
             return "#F1A208";
           });
 
-        drawLegend(stateColorScale, totalCrimesExtents, svg);
+        const hoverLegend = (i) => {
+          viewport.selectAll(".states").attr("opacity", (d) => {
+            let nCrimes = totalCrimesInStates.get(d.properties.NAME);
+            console.log(stateColorScale(nCrimes));
+            if (stateColorScale(i) == stateColorScale(nCrimes)) {
+              return 1;
+            }
+            return 0.1;
+          });
+          console.log(i);
+        };
+
+        const leaveLegend = () => {
+          viewport.selectAll(".states").attr("opacity", 1);
+        };
+
+        drawLegend(
+          stateColorScale,
+          totalCrimesExtents,
+          svg,
+          hoverLegend,
+          leaveLegend
+        );
 
         const zoom = d3
           .zoom()
@@ -174,8 +203,8 @@
             clickState(event, d, width, height, svg, path, zoom)
           );
 
-        let tooltipWidth = 120;
-        let tooltipHeight = 50;
+        let tooltipWidth = 200;
+        let tooltipHeight = 70;
         const tooltip = viewport
           .append("g")
           .attr("class", "tooltip")
@@ -186,16 +215,16 @@
           .attr("opacity", 0.8)
           .attr("width", tooltipWidth)
           .attr("height", tooltipHeight);
-        let cityLabel = tooltip.append("text").attr("x", 2).attr("y", 2);
-        let casesLabel = tooltip.append("text").attr("x", 2).attr("y", 12);
-        let solveLabel = tooltip.append("text").attr("x", 2).attr("y", 22);
-        let rateLabel = tooltip.append("text").attr("x", 2).attr("y", 32);
+        let cityLabel = tooltip.append("text").attr("x", 2).attr("y", 5);
+        let casesLabel = tooltip.append("text").attr("x", 2).attr("y", 20);
+        let solveLabel = tooltip.append("text").attr("x", 2).attr("y", 35);
+        let rateLabel = tooltip.append("text").attr("x", 2).attr("y", 50);
 
         tooltip
           .selectAll("text")
           .attr("fill", "black")
           .attr("alignment-baseline", "hanging")
-          .style("font-size", "9px");
+          .style("font-size", "1em");
         viewport.selectAll(".city").on("mouseenter", mouseEntersPlot);
         viewport.selectAll(".city").on("mouseout", mouseLeavesPlot);
 
@@ -251,15 +280,16 @@
           }
 
           tooltip.attr("transform", `translate(${xPos},${yPos})`);
+          cityLabel.text(properties.NAME);
           if (isState) {
-            cityLabel.text("State: " + properties.NAME);
+            cityLabel.style("font-weight", "bold");
           } else {
             cityLabel.text("City: " + properties.name);
           }
           casesLabel.text("# of cases: " + crimeRecord.cases);
           solveLabel.text("# of solved cases: " + crimeRecord.solve);
           rateLabel.text(
-            "Crime solve rate: " + Math.round(crimeRecord.rate * 100) + "%"
+            "Crime-solved rate: " + Math.round(crimeRecord.rate * 100) + "%"
           );
         }
 
@@ -283,14 +313,8 @@
           .attr("height", 90)
           // .attr("stroke-width", "1px")
           // .attr("stroke", "black")
-          .attr("fill", "steelblue")
+          .attr("fill", "white")
           .attr("opacity", 0.8);
-
-        crimeSolveRateLegend
-          .append("text")
-          .attr("x", 2)
-          .attr("y", 20)
-          .text("Crime Solve Rate");
 
         crimeSolveRateLegend
           .append("circle")
@@ -316,7 +340,7 @@
           .append("text")
           .attr("x", 2)
           .attr("y", 20)
-          .text("Crime Solve Rate");
+          .text("Crime-Solved Rate");
 
         crimeSolveRateLegend
           .append("text")
@@ -353,7 +377,7 @@
         svg.transition().duration(1000).call(zoom.transform, newTransform);
       };
 
-      const drawLegend = (scale, domain, svg) => {
+      const drawLegend = (scale, domain, svg, hoverLegend, leaveLegend) => {
         let legend = svg.append("g");
         let gap = Math.ceil((domain[1] - domain[0]) / 5);
         let barWidth = 50;
@@ -365,7 +389,9 @@
             .attr("y", 0)
             .attr("width", barWidth)
             .attr("height", barHeight)
-            .style("fill", () => scale(i));
+            .style("fill", () => scale(i))
+            .on("mouseenter", () => hoverLegend(i))
+            .on("mouseleave", leaveLegend);
 
           let label = legend
             .append("text")
