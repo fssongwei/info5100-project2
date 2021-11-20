@@ -393,8 +393,19 @@
             .attr("width", barWidth)
             .attr("height", barHeight)
             .style("fill", () => scale(i))
-            .on("mouseenter", () => hoverLegend(i))
-            .on("mouseleave", leaveLegend);
+            .on("mouseenter", function () {
+              d3.select(this)
+                .attr("stroke", "white")
+                .attr("stroke-width", "2px");
+
+              this.parentNode.appendChild(this);
+              hoverLegend(i);
+              console.log(this);
+            })
+            .on("mouseleave", function () {
+              leaveLegend();
+              d3.select(this).attr("stroke-width", "0");
+            });
 
           let label = legend
             .append("text")
@@ -403,7 +414,7 @@
             .attr("x", 0 + (i / gap) * barWidth)
             .attr("y", barHeight + 15);
         }
-        legend.attr("transform", "translate(0,750)");
+        legend.attr("transform", "translate(550,20)");
       };
     </script>
   </body>
