@@ -86,11 +86,14 @@
         const crimeData = await d3.csv("./crime.csv", d3.autoType);
 
         const totalCrimesInStates = new Map();
+        const totalSolvesInStates = new Map();
         const crimesRecord = new Map();
         const nCasesInStates = [];
         for (let { state, city, cases, solve, rate } of crimeData) {
           let nCase = (totalCrimesInStates.get(state) || 0) + cases;
           totalCrimesInStates.set(state, nCase);
+          let nSolve = (totalSolvesInStates.get(state) || 0) + solve;
+          totalSolvesInStates.set(state, nSolve);
           nCasesInStates.push(nCase);
           crimesRecord.set(`${state}/${city}`, { cases, solve, rate });
         }
@@ -102,7 +105,9 @@
           .domain(totalCrimesExtents)
           .range([d3.rgb("#eee"), d3.rgb("#000")]);
 
-        viewport
+        const stateElem = viewport.append("g");
+
+        stateElem
           .selectAll("states")
           .data(states.features)
           .join("path")
@@ -111,52 +116,21 @@
           .style("fill", (d) => {
             return stateColorScale(totalCrimesInStates.get(d.properties.NAME));
           })
-          .on("mouseover", function () {
+          .on("mouseover", function (event, data) {
             d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
-            // this.parentNode.appendChild(this);
-            // d3.select(this).attr("transform", `scale(${1.1})`);
-            // d3.select(this).attr("transform-origin", "center");
+            this.parentNode.appendChild(this);
+            mouseEntersPlot(event, data, this);
           })
-          .on("mouseout", function () {
+          .on("mouseout", function (event, data) {
             d3.select(this).attr("stroke-width", 0);
-            // this.parentNode.insertBefore(this, this.parentNode.firstChild);
+            this.parentNode.insertBefore(this, this.parentNode.firstChild);
+            mouseLeavesPlot(event, data, this);
           });
-
-        // console.log(statesMesh);
-
-        // viewport
-        //   .selectAll(".outline")
-        //   .data(statesMesh.features)
-        //   .join("path")
-        //   .attr("class", "outline")
-        //   .attr("d", path)
-        //   .on("mouseover", function () {
-        //     d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
-        //     // d3.select(this).attr("transform", `scale(${1.1})`);
-        //     // d3.select(this).attr("transform-origin", "center");
-        //   })
-        //   .on("mouseout", function () {
-        //     d3.select(this).attr("stroke-width", 0);
-        //   });
-
-        // viewport
-        //   .append("path")
-        //   .datum(statesMesh)
-        //   .attr("class", "outline")
-        //   .attr("d", path)
-        //   .on("mouseover", function () {
-        //     d3.select(this).attr("stroke", "white").attr("stroke-width", "3px");
-        //     // d3.select(this).attr("transform", `scale(${1.1})`);
-        //     // d3.select(this).attr("transform-origin", "center");
-        //   })
-        //   .on("mouseout", function () {
-        //     d3.select(this).attr("stroke-width", 0);
-        //   });
 
         let radiusScale = d3
           .scaleLinear()
           .domain(totalCrimesExtents)
-          .range([3, 10]);
+          .range([3, 20]);
 
         viewport
           .selectAll("cities")
@@ -184,7 +158,6 @@
             if (crimeRecord.rate > 0.7) return "#0CA77D";
             return "#F1A208";
           });
-        //   .on("mouseenter", mouseEntersPlot());
 
         drawLegend(stateColorScale, totalCrimesExtents, svg);
 
@@ -226,33 +199,63 @@
         viewport.selectAll(".city").on("mouseenter", mouseEntersPlot);
         viewport.selectAll(".city").on("mouseout", mouseLeavesPlot);
 
-        function mouseEntersPlot() {
+        function mouseEntersPlot(event, d, elem) {
           tooltip.style("visibility", "visible");
 
-          const city = d3.select(this);
+          const city = d3.select(elem || this);
           const data = city.datum();
+
           const coordinates = data.geometry.coordinates;
           const properties = data.properties;
 
-          city
-            .attr("opacity", 1)
-            .attr("stroke", "white")
-            .attr("stroke-width", "1px");
-          let currentR = city.attr("r");
-          city.attr("r", currentR * 1.5);
-          city.attr("originalRadius", currentR);
+          let isState = !!properties.STUSPS;
+
+          if (!isState) {
+            city
+              .attr("opacity", 1)
+              .attr("stroke", "white")
+              .attr("stroke-width", "1px");
+            let currentR = city.attr("r");
+            city.attr("r", currentR * 1.5);
+            city.attr("originalRadius", currentR);
+          }
 
           let crimeRecord = crimesRecord.get(
             `${properties.state}/${properties.name}`
           );
+
+          if (isState) {
+            let solve = totalSolvesInStates.get(properties.NAME);
+            let cases = totalCrimesInStates.get(properties.NAME);
+            crimeRecord = {
+              cases,
+              solve,
+              rate: solve / cases,
+            };
+          }
+
           if (!crimeRecord) return;
 
-          let pos = projection(coordinates);
-          let xPos = pos[0] + 10;
-          let yPos = pos[1];
+          let pos;
+          let xPos;
+          let yPos;
+
+          if (isState) {
+            bounds = path.bounds(data);
+            xPos = (bounds[0][0] + bounds[1][0]) / 2.0;
+            yPos = bounds[1][1] - 15;
+          } else {
+            pos = projection(coordinates);
+            xPos = pos[0] + 10;
+            yPos = pos[1];
+          }
 
           tooltip.attr("transform", `translate(${xPos},${yPos})`);
-          cityLabel.text("City: " + properties.name);
+          if (isState) {
+            cityLabel.text("State: " + properties.NAME);
+          } else {
+            cityLabel.text("City: " + properties.name);
+          }
           casesLabel.text("# of cases: " + crimeRecord.cases);
           solveLabel.text("# of solved cases: " + crimeRecord.solve);
           rateLabel.text(
@@ -260,12 +263,14 @@
           );
         }
 
-        function mouseLeavesPlot() {
+        function mouseLeavesPlot(event, d, elem) {
+          tooltip.style("visibility", "hidden");
+          if (elem) return;
           const city = d3.select(this);
           city.attr("opacity", 1).attr("stroke-width", "0px");
+          if (elem) return;
           let originalR = city.attr("originalRadius");
           city.attr("r", originalR);
-          tooltip.style("visibility", "hidden");
         }
 
         // Circle Legend 2
